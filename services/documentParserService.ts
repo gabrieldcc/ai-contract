@@ -1,12 +1,15 @@
-export const documentParserService = {
-  async extractTextFromDocument(fileUri: string): Promise<string> {
-    await delay(650);
+import { ParsedDocumentPayload, UploadedContractFile } from '@/types/contract';
+import * as FileSystem from 'expo-file-system/legacy';
 
-    // TODO: integrar parser real para PDF/DOC/DOCX
-    return `Texto extraído de forma simulada para: ${fileUri}`;
+export const documentParserService = {
+  async extractTextFromDocument(file: UploadedContractFile): Promise<ParsedDocumentPayload> {
+    const base64File = await FileSystem.readAsStringAsync(file.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    return {
+      fileName: file.name,
+      fileDataUrl: `data:application/pdf;base64,${base64File}`,
+    };
   },
 };
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

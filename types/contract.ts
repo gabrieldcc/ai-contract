@@ -4,9 +4,14 @@ export type UploadedContractFile = {
   id: string;
   name: string;
   sizeLabel: string;
-  type: 'pdf' | 'doc' | 'docx';
+  type: 'pdf';
   uri: string;
   uploadedAt: string;
+};
+
+export type ParsedDocumentPayload = {
+  fileName: string;
+  fileDataUrl: string;
 };
 
 export type ContractAnalysis = {

@@ -37,11 +37,7 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
 
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          'application/pdf',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ],
+        type: 'application/pdf',
         copyToCacheDirectory: true,
         multiple: false,
       });
@@ -54,7 +50,7 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
       const extension = asset.name.split('.').pop()?.toLowerCase();
 
       if (!extension || !isSupportedFileType(extension)) {
-        setError('Selecione um arquivo PDF, DOC ou DOCX.');
+        setError('Selecione um arquivo PDF.');
         return;
       }
 
@@ -62,7 +58,7 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
         id: asset.uri,
         name: asset.name,
         sizeLabel: formatFileSize(asset.size),
-        type: extension,
+        type: 'pdf',
         uri: asset.uri,
         uploadedAt: new Date().toISOString(),
       };
@@ -90,8 +86,8 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
     setIsAnalyzing(true);
 
     try {
-      const extractedText = await documentParserService.extractTextFromDocument(selectedFile.uri);
-      const generatedAnalysis = await analysisService.generateAnalysis(extractedText, selectedFile.name);
+      const parsedDocument = await documentParserService.extractTextFromDocument(selectedFile);
+      const generatedAnalysis = await analysisService.generateAnalysis(parsedDocument, selectedFile.name);
       await storageService.saveAnalysis(generatedAnalysis);
 
       setCurrentAnalysis(generatedAnalysis);
@@ -105,8 +101,8 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
         ...prev,
       ]);
       return true;
-    } catch {
-      setError('Falha ao gerar análise simulada.');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Falha ao gerar a analise do contrato.');
       return false;
     } finally {
       setIsAnalyzing(false);
@@ -171,5 +167,5 @@ export function useContractFlow() {
 }
 
 function isSupportedFileType(value: string): value is UploadedContractFile['type'] {
-  return value === 'pdf' || value === 'doc' || value === 'docx';
+  return value === 'pdf';
 }

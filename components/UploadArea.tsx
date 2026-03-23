@@ -14,7 +14,7 @@ export function UploadArea({ onSelectFile, loading }: Props) {
     <View style={styles.container}>
       <Ionicons name="cloud-upload-outline" size={32} color={colors.primary} />
       <Text style={styles.title}>Adicione seu contrato</Text>
-      <Text style={styles.description}>PDF, DOC ou DOCX pelo seletor nativo do dispositivo</Text>
+      <Text style={styles.description}>PDF pelo seletor nativo do dispositivo</Text>
       <ActionButton label="Selecionar arquivo" onPress={onSelectFile} variant="secondary" loading={loading} />
     </View>
   );
