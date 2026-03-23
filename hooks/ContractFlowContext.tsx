@@ -1,8 +1,10 @@
-import { MOCK_HISTORY, MOCK_SELECTED_FILE } from '@/constants/mocks';
+import { MOCK_HISTORY } from '@/constants/mocks';
 import { analysisService } from '@/services/analysisService';
 import { documentParserService } from '@/services/documentParserService';
 import { storageService } from '@/services/storageService';
 import { AnalysisHistoryItem, ContractAnalysis, UploadedContractFile } from '@/types/contract';
+import { formatFileSize } from '@/utils/format';
+import * as DocumentPicker from 'expo-document-picker';
 import React, { createContext, useContext, useMemo, useState } from 'react';
 
 type ContractFlowContextValue = {
@@ -12,7 +14,7 @@ type ContractFlowContextValue = {
   isSelectingFile: boolean;
   isAnalyzing: boolean;
   error: string | null;
-  selectMockFile: () => Promise<void>;
+  selectFile: () => Promise<void>;
   clearSelectedFile: () => void;
   analyzeSelectedContract: () => Promise<boolean>;
   openHistoryAnalysis: (id: string) => Promise<boolean>;
@@ -29,18 +31,46 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectMockFile = async () => {
+  const selectFile = async () => {
     setError(null);
     setIsSelectingFile(true);
 
     try {
-      await storageService.uploadContract(MOCK_SELECTED_FILE);
-      setSelectedFile({
-        ...MOCK_SELECTED_FILE,
-        uploadedAt: new Date().toISOString(),
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
       });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const extension = asset.name.split('.').pop()?.toLowerCase();
+
+      if (!extension || !isSupportedFileType(extension)) {
+        setError('Selecione um arquivo PDF, DOC ou DOCX.');
+        return;
+      }
+
+      const pickedFile: UploadedContractFile = {
+        id: asset.uri,
+        name: asset.name,
+        sizeLabel: formatFileSize(asset.size),
+        type: extension,
+        uri: asset.uri,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      await storageService.uploadContract(pickedFile);
+      setSelectedFile(pickedFile);
     } catch {
-      setError('Não foi possível simular o upload do contrato.');
+      setError('Nao foi possivel selecionar o contrato.');
     } finally {
       setIsSelectingFile(false);
     }
@@ -118,7 +148,7 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
       isSelectingFile,
       isAnalyzing,
       error,
-      selectMockFile,
+      selectFile,
       clearSelectedFile,
       analyzeSelectedContract,
       openHistoryAnalysis,
@@ -138,4 +168,8 @@ export function useContractFlow() {
   }
 
   return context;
+}
+
+function isSupportedFileType(value: string): value is UploadedContractFile['type'] {
+  return value === 'pdf' || value === 'doc' || value === 'docx';
 }

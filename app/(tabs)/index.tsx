@@ -18,7 +18,7 @@ export default function HomeScreen() {
     isSelectingFile,
     isAnalyzing,
     error,
-    selectMockFile,
+    selectFile,
     clearSelectedFile,
     analyzeSelectedContract,
   } = useContractFlow();
@@ -37,7 +37,7 @@ export default function HomeScreen() {
         <AppHeader title={APP_TEXTS.homeTitle} subtitle={APP_TEXTS.homeDescription} />
       </View>
 
-      <UploadArea onSelectFile={selectMockFile} loading={isSelectingFile} />
+      <UploadArea onSelectFile={selectFile} loading={isSelectingFile} />
 
       {selectedFile ? (
         <ContractFileCard file={selectedFile} onRemove={clearSelectedFile} />
