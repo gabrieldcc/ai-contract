@@ -34,6 +34,7 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
   const selectFile = async () => {
     setError(null);
     setIsSelectingFile(true);
+    console.log('ContractFlow.selectFile:start');
 
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -43,6 +44,7 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
       });
 
       if (result.canceled) {
+        console.log('ContractFlow.selectFile:canceled');
         return;
       }
 
@@ -63,9 +65,18 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
         uploadedAt: new Date().toISOString(),
       };
 
+      console.log('ContractFlow.selectFile:selected', {
+        name: pickedFile.name,
+        uri: pickedFile.uri,
+        sizeLabel: pickedFile.sizeLabel,
+      });
+
       await storageService.uploadContract(pickedFile);
       setSelectedFile(pickedFile);
-    } catch {
+    } catch (error) {
+      console.error('ContractFlow.selectFile:error', {
+        error,
+      });
       setError('Nao foi possivel selecionar o contrato.');
     } finally {
       setIsSelectingFile(false);
@@ -84,10 +95,24 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
 
     setError(null);
     setIsAnalyzing(true);
+    console.log('ContractFlow.analyzeSelectedContract:start', {
+      fileName: selectedFile.name,
+      fileUri: selectedFile.uri,
+    });
 
     try {
       const parsedDocument = await documentParserService.extractTextFromDocument(selectedFile);
+      console.log('ContractFlow.analyzeSelectedContract:documentParsed', {
+        fileName: parsedDocument.fileName,
+        dataUrlPrefix: parsedDocument.fileDataUrl.slice(0, 32),
+        dataUrlLength: parsedDocument.fileDataUrl.length,
+      });
+
       const generatedAnalysis = await analysisService.generateAnalysis(parsedDocument, selectedFile.name);
+      console.log('ContractFlow.analyzeSelectedContract:analysisGenerated', {
+        fileName: generatedAnalysis.fileName,
+        createdAt: generatedAnalysis.createdAt,
+      });
       await storageService.saveAnalysis(generatedAnalysis);
 
       setCurrentAnalysis(generatedAnalysis);
@@ -102,6 +127,10 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
       ]);
       return true;
     } catch (error) {
+      console.error('ContractFlow.analyzeSelectedContract:error', {
+        fileName: selectedFile.name,
+        error,
+      });
       setError(error instanceof Error ? error.message : 'Falha ao gerar a analise do contrato.');
       return false;
     } finally {
