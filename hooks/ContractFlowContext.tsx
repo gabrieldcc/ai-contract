@@ -35,18 +35,17 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
     setError(null);
     setIsSelectingFile(true);
 
+    console.log('ContractFlow.selectFile:start');
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          'application/pdf',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ],
+        type: 'application/pdf',
         copyToCacheDirectory: true,
         multiple: false,
       });
 
       if (result.canceled) {
+        console.log('ContractFlow.selectFile:canceled');
         return;
       }
 
@@ -54,7 +53,11 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
       const extension = asset.name.split('.').pop()?.toLowerCase();
 
       if (!extension || !isSupportedFileType(extension)) {
-        setError('Selecione um arquivo PDF, DOC ou DOCX.');
+        console.error('ContractFlow.selectFile:invalidType', {
+          assetName: asset.name,
+          extension,
+        });
+        setError('Selecione um arquivo PDF.');
         return;
       }
 
@@ -62,14 +65,28 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
         id: asset.uri,
         name: asset.name,
         sizeLabel: formatFileSize(asset.size),
-        type: extension,
+        type: 'pdf',
         uri: asset.uri,
         uploadedAt: new Date().toISOString(),
       };
 
+      console.log('ContractFlow.selectFile:selected', {
+        fileName: pickedFile.name,
+        fileUri: pickedFile.uri,
+        sizeLabel: pickedFile.sizeLabel,
+      });
+
       await storageService.uploadContract(pickedFile);
+
+      console.log('ContractFlow.selectFile:success', {
+        fileName: pickedFile.name,
+      });
+
       setSelectedFile(pickedFile);
-    } catch {
+    } catch (error) {
+      console.error('ContractFlow.selectFile:error', {
+        error,
+      });
       setError('Nao foi possivel selecionar o contrato.');
     } finally {
       setIsSelectingFile(false);
@@ -77,6 +94,7 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
   };
 
   const clearSelectedFile = () => {
+    console.log('ContractFlow.clearSelectedFile');
     setSelectedFile(null);
   };
 
@@ -89,9 +107,21 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
     setError(null);
     setIsAnalyzing(true);
 
+    console.log('ContractFlow.analyzeSelectedContract:start', {
+      fileName: selectedFile.name,
+      fileUri: selectedFile.uri,
+    });
+
     try {
-      const extractedText = await documentParserService.extractTextFromDocument(selectedFile.uri);
-      const generatedAnalysis = await analysisService.generateAnalysis(extractedText, selectedFile.name);
+      const parsedDocument = await documentParserService.extractTextFromDocument(selectedFile);
+
+      console.log('ContractFlow.analyzeSelectedContract:documentParsed', {
+        fileName: parsedDocument.fileName,
+        extractedTextLength: parsedDocument.extractedText.length,
+        extractedTextPreview: parsedDocument.extractedText.slice(0, 120),
+      });
+
+      const generatedAnalysis = await analysisService.generateAnalysis(parsedDocument, selectedFile.name);
       await storageService.saveAnalysis(generatedAnalysis);
 
       setCurrentAnalysis(generatedAnalysis);
@@ -104,9 +134,19 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
         },
         ...prev,
       ]);
+
+      console.log('ContractFlow.analyzeSelectedContract:success', {
+        fileName: generatedAnalysis.fileName,
+        createdAt: generatedAnalysis.createdAt,
+      });
+
       return true;
-    } catch {
-      setError('Falha ao gerar análise simulada.');
+    } catch (error) {
+      console.error('ContractFlow.analyzeSelectedContract:error', {
+        fileName: selectedFile.name,
+        error,
+      });
+      setError(error instanceof Error ? error.message : 'Falha ao gerar a analise do contrato.');
       return false;
     } finally {
       setIsAnalyzing(false);
@@ -117,16 +157,30 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
     setError(null);
     setIsAnalyzing(true);
 
+    console.log('ContractFlow.openHistoryAnalysis:start', { id });
+
     try {
       const analysis = await storageService.getAnalysisById(id);
+
       if (!analysis) {
+        console.error('ContractFlow.openHistoryAnalysis:notFound', { id });
         setError('A análise selecionada não foi encontrada.');
         return false;
       }
 
       setCurrentAnalysis(analysis);
+
+      console.log('ContractFlow.openHistoryAnalysis:success', {
+        id,
+        fileName: analysis.fileName,
+      });
+
       return true;
-    } catch {
+    } catch (error) {
+      console.error('ContractFlow.openHistoryAnalysis:error', {
+        id,
+        error,
+      });
       setError('Não foi possível carregar os detalhes da análise.');
       return false;
     } finally {
@@ -135,6 +189,7 @@ export function ContractFlowProvider({ children }: { children: React.ReactNode }
   };
 
   const resetForNewAnalysis = () => {
+    console.log('ContractFlow.resetForNewAnalysis');
     setSelectedFile(null);
     setCurrentAnalysis(null);
     setError(null);
@@ -171,5 +226,5 @@ export function useContractFlow() {
 }
 
 function isSupportedFileType(value: string): value is UploadedContractFile['type'] {
-  return value === 'pdf' || value === 'doc' || value === 'docx';
+  return value === 'pdf';
 }
