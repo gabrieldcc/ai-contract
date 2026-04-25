@@ -31,6 +31,7 @@ export const analysisService = {
       fileName,
       url: OPENROUTER_API_URL,
       model: OPENROUTER_MODEL,
+      apiKeyFingerprint: maskSecret(OPENROUTER_API_KEY),
       documentFileName: document.fileName,
       extractedTextLength: document.extractedText.length,
       extractedTextPreview: document.extractedText.slice(0, 120),
@@ -87,6 +88,9 @@ ${document.extractedText}
         fileName,
         status: response.status,
         ok: response.ok,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type'),
+        requestId: response.headers.get('x-request-id'),
       });
 
       const rawText = await response.text();
@@ -97,7 +101,16 @@ ${document.extractedText}
       });
 
       if (!response.ok) {
-        throw new Error(`OpenRouter error: ${response.status} ${rawText}`);
+        console.error('analysisService.generateAnalysis:requestFailed', {
+          fileName,
+          status: response.status,
+          statusText: response.statusText,
+          requestId: response.headers.get('x-request-id'),
+          responseBody: rawText,
+          likelyCause: inferOpenRouterCause(response.status, rawText),
+        });
+
+        throw new Error(formatOpenRouterError(response.status, rawText));
       }
 
       const payload = JSON.parse(rawText) as OpenRouterResponse;
@@ -131,7 +144,8 @@ ${document.extractedText}
       console.error('analysisService.generateAnalysis:error', {
         fileName,
         url: OPENROUTER_API_URL,
-        error,
+        apiKeyFingerprint: maskSecret(OPENROUTER_API_KEY),
+        error: serializeError(error),
       });
       throw error;
     }
@@ -190,4 +204,67 @@ function asStringArray(value: unknown): string[] {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatOpenRouterError(status: number, rawText: string): string {
+  const normalizedBody = rawText.trim();
+  const likelyCause = inferOpenRouterCause(status, rawText);
+
+  if (!normalizedBody) {
+    return `OpenRouter error: ${status}. ${likelyCause}`;
+  }
+
+  return `OpenRouter error: ${status}. ${normalizedBody}. ${likelyCause}`;
+}
+
+function inferOpenRouterCause(status: number, rawText: string): string {
+  const normalizedBody = rawText.toLowerCase();
+
+  if (status === 401 && normalizedBody.includes('user not found')) {
+    return 'A chave da OpenRouter parece invalida, revogada, vinculada a uma conta inexistente ou nao esta sendo lida corretamente pelo app.';
+  }
+
+  if (status === 401) {
+    return 'A autenticacao da OpenRouter falhou. Verifique a chave em EXPO_PUBLIC_OPENROUTER_API_KEY.';
+  }
+
+  if (status === 403) {
+    return 'A chave foi reconhecida, mas nao tem permissao para este recurso ou modelo.';
+  }
+
+  if (status === 429) {
+    return 'O limite de requisicoes ou credito da OpenRouter pode ter sido excedido.';
+  }
+
+  if (status >= 500) {
+    return 'A OpenRouter retornou erro interno.';
+  }
+
+  return 'Falha ao chamar a OpenRouter.';
+}
+
+function serializeError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return {
+    value: error,
+  };
+}
+
+function maskSecret(value: string | undefined): string {
+  if (!value) {
+    return 'missing';
+  }
+
+  if (value.length <= 8) {
+    return `${value.slice(0, 2)}***`;
+  }
+
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
